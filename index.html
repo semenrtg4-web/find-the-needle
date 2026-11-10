@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a1408">
+<title>Needle in the Haystack — Найди иголку</title>
+<style>
+  :root {
+    --bg-1: #1a1408; --bg-2: #2a2010; --panel: #241c0e; --panel-2: #2e2412;
+    --border: #4a3a1c; --text: #f0e6d0; --muted: #a8946a;
+    --accent: #f2b33d; --accent-2: #e08a2c;
+    --success: #6fcf6f; --danger: #e05555;
+    --radius: 12px; --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  body.light {
+    --bg-1: #f5eeda; --bg-2: #e8ddc0; --panel: #fffaf0; --panel-2: #f5edd8;
+    --border: #d0bc8c; --text: #3a2e14; --muted: #8a7648;
+    --accent: #c98a1c; --accent-2: #a8700c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: radial-gradient(circle at 30% 10%, var(--bg-2), var(--bg-1));
+    color: var(--text); min-height: 100vh; overflow-x: hidden;
+    transition: background 0.4s, color 0.3s;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+  #app {
+    max-width: 1100px; margin: 0 auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 10px; min-height: 100vh;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; flex-wrap: wrap; background: var(--panel);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 14px;
+  }
+  .topbar h1 { font-size: 18px; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; }
+  .topbar h1 small { font-size: 11px; color: var(--muted); font-weight: 500; display: block; }
+  .res { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+  .res .item { display: flex; flex-direction: column; align-items: flex-end; }
+  .res .item .l { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .res .item .v { font-weight: 800; font-size: 16px; color: var(--accent); }
+  .res .item .v.off { color: var(--muted); }
+  .themeBtn {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); width: 38px; height: 38px; border-radius: 50%;
+    font-size: 18px; cursor: pointer;
+  }
+  .tabs {
+    display: flex; gap: 4px; overflow-x: auto; background: var(--panel);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 4px;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto; padding: 9px 16px; border: none; background: transparent;
+    color: var(--muted); font-weight: 700; font-size: 13px; border-radius: 8px;
+    cursor: pointer; transition: background 0.2s, color 0.2s;
+    font-family: inherit; white-space: nowrap;
+  }
+  .tab.active { background: var(--accent); color: #1a1408; }
+  .tab:hover:not(.active) { background: var(--panel-2); color: var(--text); }
+  .tab .badge {
+    display: inline-block; background: var(--danger); color: #fff;
+    font-size: 9px; padding: 1px 5px; border-radius: 8px;
+    margin-left: 4px; vertical-align: middle;
+  }
+  .panel {
+    display: none; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+  }
+  .panel.active { display: block; }
+  .panel h2 { font-size: 15px; color: var(--accent); margin-bottom: 10px; }
+  .panel p.desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+
+  #worldWrap {
+    position: relative; width: 100%; border-radius: var(--radius);
+    overflow: hidden; border: 3px solid #4a3a1c; background: #2a2010;
+    user-select: none; touch-action: none;
+    aspect-ratio: 4 / 3; max-height: 70vh;
+  }
+  #worldCanvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  #worldHud {
+    position: absolute; top: 8px; left: 8px;
+    display: flex; flex-direction: column; gap: 4px; font-size: 11px;
+    pointer-events: none; z-index: 3;
+  }
+  #worldHud .wcell {
+    background: rgba(0,0,0,0.6); border-radius: 6px; padding: 4px 8px;
+    color: #f0e6d0; font-weight: 700;
+  }
+  #worldHud .wcell span { color: var(--accent); }
+  #worldHud .equip {
+    background: rgba(111,207,111,0.25);
+    border: 1px solid var(--success);
+    color: #c8ffc8;
+  }
+  #worldHud .autoon {
+    background: rgba(242,179,61,0.25);
+    border: 1px solid var(--accent);
+    color: #ffe4a0;
+  }
+  #worldHud .autooff {
+    background: rgba(224,85,85,0.25);
+    border: 1px solid var(--danger);
+    color: #ffc0c0;
+  }
+  #worldMsg {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.75); color: #fff; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 20px; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s; z-index: 3; white-space: nowrap;
+    max-width: 90%;
+  }
+  #worldMsg.show { opacity: 1; }
+
+  /* ==== КОНТРОЛЫ ТОЛЬКО ДЛЯ МОБИЛЬНЫХ ==== */
+  .mobileControls {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    display: none;
+  }
+  .mobileControls .dpad {
+    position: absolute;
+    bottom: 20px; left: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 80px);
+    grid-template-rows: repeat(3, 80px);
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .mobileControls .dpad button {
+    width: 80px; height: 80px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff; border-radius: 14px;
+    font-size: 32px; cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s, transform 0.1s;
+  }
+  .mobileControls .dpad button:active {
+    background: rgba(242,179,61,0.9);
+    color: #1a1408;
+    transform: scale(0.95);
+  }
+  .mobileControls .actionBtn {
+    position: absolute;
+    bottom: 30px; right: 20px;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffd76a, #e08a2c);
+    border: 3px solid #fff;
+    color: #1a1408;
+    font-size: 14px; font-weight: 900;
+    cursor: pointer;
+    pointer-events: auto;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    user-select: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 -4px 10px rgba(0,0,0,0.2);
+    touch-action: none;
+    line-height: 1.2;
+  }
+  .mobileControls .actionBtn:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.3);
+  }
+
+  .btn {
+    padding: 10px 18px; border: none; border-radius: 8px;
+    font-weight: 700; font-size: 13px; font-family: inherit;
+    cursor: pointer; color: #1a1408;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    transition: transform 0.12s, filter 0.15s; margin: 3px 3px 3px 0;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.danger { background: linear-gradient(135deg, #e05555, #a83030); color: #fff; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .card {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card.owned { border-color: var(--success); background: rgba(111,207,111,0.08); }
+  .card.equipped {
+    border-color: #5fb85f;
+    box-shadow: 0 0 0 2px #5fb85f inset;
+    background: rgba(111,207,111,0.15);
+  }
+  .card.locked { opacity: 0.5; }
+  .card .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+  .card .name { font-weight: 800; font-size: 13px; color: var(--text); }
+  .card .equippedTag {
+    display: inline-block; font-size: 9px; background: var(--success); color: #0a2a0a;
+    padding: 1px 6px; border-radius: 8px; margin-left: 4px; font-weight: 900;
+    vertical-align: middle;
+  }
+  .card .icon { font-size: 20px; }
+  .card .desc { font-size: 11px; color: var(--muted); line-height: 1.4; flex: 1; }
+  .card .bonus { font-size: 10px; color: var(--success); font-weight: 700; margin-top: 2px; }
+  .card .price {
+    font-weight: 800; font-size: 13px; color: var(--accent);
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  }
+  .card .price .cnt { font-size: 10px; color: var(--muted); font-weight: 500; }
+  .card .btnRow { display: flex; gap: 4px; }
+  .card button {
+    padding: 7px 10px; font-size: 12px; border: none; border-radius: 6px;
+    font-family: inherit; font-weight: 700; cursor: pointer;
+    background: var(--accent); color: #1a1408;
+    transition: filter 0.15s;
+    flex: 1;
+  }
+  .card button:hover:not(:disabled) { filter: brightness(1.15); }
+  .card button:active:not(:disabled) { transform: scale(0.97); }
+  .card button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .card button.equipBtn {
+    background: transparent; color: var(--success);
+    border: 1px solid var(--success);
+    flex: 0 0 auto;
+    font-size: 11px;
+  }
+  .card button.equipBtn:hover { background: rgba(111,207,111,0.2); }
+  .card button.equipBtn.on { background: var(--success); color: #0a2a0a; }
+
+  .craftRow {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px; gap: 10px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .craftRow .info { flex: 1; min-width: 140px; }
+  .craftRow .info .n { font-weight: 700; font-size: 13px; }
+  .craftRow .info .d { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .craftRow .btn { margin: 0; }
+
+  #log {
+    max-height: 120px; overflow-y: auto; font-size: 11px;
+    font-family: 'Consolas', monospace; color: var(--muted);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; line-height: 1.6;
+  }
+  #log .ok { color: var(--success); }
+  #log .warn { color: var(--accent); }
+  #log .bad { color: var(--danger); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border: 2px solid var(--accent);
+    border-radius: var(--radius); padding: 24px; max-width: 420px; width: 100%;
+    text-align: center;
+  }
+  .modal h2 { color: var(--accent); font-size: 22px; margin-bottom: 10px; }
+  .modal p { font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 16px; }
+
+  #toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--accent); padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; opacity: 0;
+    transition: transform 0.3s, opacity 0.3s; z-index: 200;
+    pointer-events: none; max-width: 90vw;
+    text-align: center;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ============================================================
+     МОБИЛЬНАЯ ОПТИМИЗАЦИЯ
+     ============================================================ */
+  @media (max-width: 768px), (pointer: coarse) {
+    #app { padding: 6px; gap: 6px; }
+    .topbar {
+      padding: 6px 10px;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+    .topbar h1 { font-size: 13px; flex: 1; min-width: 0; }
+    .topbar h1 small { font-size: 10px; }
+    .themeBtn { width: 34px; height: 34px; font-size: 16px; flex-shrink: 0; }
+    .res {
+      order: 3;
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      margin-top: 2px;
+    }
+    .res .item { align-items: center; flex: 1; }
+    .res .item .l { font-size: 9px; }
+    .res .item .v { font-size: 14px; }
+
+    .tabs { padding: 3px; gap: 2px; }
+    .tab {
+      padding: 10px 12px;
+      font-size: 12px;
+      min-height: 42px;
+      display: flex; align-items: center;
+    }
+
+    .panel { padding: 10px; }
+    .panel h2 { font-size: 14px; margin-bottom: 8px; }
+    .panel p.desc { font-size: 11px; margin-bottom: 10px; }
+
+    #worldWrap {
+      aspect-ratio: auto;
+      height: 58vh;
+      max-height: 58vh;
+      min-height: 320px;
+      border-width: 2px;
+      border-radius: 8px;
+    }
+    #worldHud { font-size: 10px; gap: 3px; top: 6px; left: 6px; }
+    #worldHud .wcell { padding: 3px 6px; font-size: 10px; }
+
+    .mobileControls { display: block; }
+
+    #log { display: none; }
+
+    .grid { grid-template-columns: 1fr; gap: 6px; }
+    .card { padding: 10px; }
+    .card .name { font-size: 14px; }
+    .card .desc { font-size: 12px; }
+    .card .icon { font-size: 24px; }
+    .card button {
+      padding: 12px 14px;
+      font-size: 14px;
+      min-height: 48px;
+    }
+    .card button.equipBtn { font-size: 13px; padding: 12px; }
+
+    .craftRow { padding: 12px; }
+    .craftRow .info .n { font-size: 14px; }
+    .craftRow .info .d { font-size: 12px; }
+    .craftRow .btn { min-height: 48px; padding: 12px 16px; font-size: 14px; }
+
+    .modal { padding: 20px; }
+    .modal h2 { font-size: 19px; }
+    .modal p { font-size: 13px; }
+
+    #toast { font-size: 13px; padding: 10px 16px; }
+  }
+
+  /* Маленькие экраны (iPhone SE и т.п.) */
+  @media (max-width: 380px) {
+    .mobileControls .dpad {
+      grid-template-columns: repeat(3, 64px);
+      grid-template-rows: repeat(3, 64px);
+      gap: 4px;
+      bottom: 12px; left: 12px;
+    }
+    .mobileControls .dpad button {
+      width: 64px; height: 64px;
+      font-size: 26px;
+      border-radius: 12px;
+    }
+    .mobileControls .actionBtn {
+      width: 88px; height: 88px;
+      bottom: 20px; right: 12px;
+      font-size: 12px;
+    }
+    #worldWrap { height: 55vh; min-height: 280px; }
+  }
+
+  /* Ландшафтная ориентация на телефоне */
+  @media (max-height: 500px) and (pointer: coarse) {
+    #worldWrap { height: 70vh; min-height: 220px; }
+    .mobileControls .dpad {
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(3, 56px);
+      bottom: 8px; left: 8px;
+    }
+    .mobileControls .dpad button { width: 56px; height: 56px; font-size: 22px; }
+    .mobileControls .actionBtn {
+      width: 80px; height: 80px;
+      bottom: 12px; right: 8px;
+      font-size: 11px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar">
+    <h1>🧵 Needle in the Haystack<small>Иголок: <span id="needlesFound">0</span>/24 · Игрок: <span id="playerLv">ур. 1</span></small></h1>
+    <div class="res">
+      <div class="item"><span class="l">Сено</span><span class="v" id="rHay">0</span></div>
+      <div class="item"><span class="l">Деньги</span><span class="v" id="rMoney">0</span></div>
+      <div class="item"><span class="l">Иголки</span><span class="v" id="rNeedles">0</span></div>
+      <div class="item"><span class="l">Пассив</span><span class="v off" id="rRate">0</span></div>
+    </div>
+    <button class="themeBtn" id="themeBtn" title="Тема">🌙</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="world">🎮 Склад</button>
+    <button class="tab" data-tab="shop">🛒 Магазин</button>
+    <button class="tab" data-tab="tech">🌳 Технологии</button>
+    <button class="tab" data-tab="craft">⚙️ Переработка</button>
+    <button class="tab" data-tab="stats">📊 Статистика</button>
+  </div>
+
+  <div class="panel active" id="panel-world">
+    <h2>Склад</h2>
+    <p class="desc">
+      <b>WASD / стрелки / D-pad</b> — ходить. <b>Пробел / E / кнопка действия</b> — собрать сено или сдать на базе.
+      <span class="desktop-only">Клик по полу — идти к точке.</span>
+    </p>
+    <div id="worldWrap">
+      <canvas id="worldCanvas" width="1400" height="1050"></canvas>
+      <div id="worldHud">
+        <div class="wcell">🎒 Сено: <span id="carryHay">0</span> / <span id="carryMax">15</span></div>
+        <div class="wcell">💪 Уровень: <span id="playerLvHud">1</span></div>
+        <div class="wcell equip" id="equipHud">🖐 Без инструмента</div>
+        <div class="wcell autooff" id="autoHud">🔒 Пассив: закрыт</div>
+      </div>
+      <div id="worldMsg"></div>
+      <div class="mobileControls">
+        <div class="dpad">
+          <div></div><button data-dir="up">▲</button><div></div>
+          <button data-dir="left">◀</button><div></div><button data-dir="right">▶</button>
+          <div></div><button data-dir="down">▼</button><div></div>
+        </div>
+        <button class="actionBtn" id="actionBtn">СОБРАТЬ<br>/СДАТЬ</button>
+      </div>
+    </div>
+    <div id="log" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="panel" id="panel-shop">
+    <h2>Магазин оборудования</h2>
+    <p class="desc">
+      Инструменты дают бонусы к ручному сбору — работают, только когда экипированы.
+      Оборудование даёт пассивный доход, но он <b>заблокирован</b> до изучения технологий автоматизации.
+    </p>
+    <div class="grid" id="shopGrid"></div>
+  </div>
+
+  <div class="panel" id="panel-tech">
+    <h2>Дерево технологий</h2>
+    <p class="desc">Автоматизация открывается постепенно. Без этих технологий пассивный доход = 0.</p>
+    <div class="grid" id="techGrid"></div>
+  </div>
+
+  <div class="panel" id="panel-craft">
+    <h2>Переработка сена</h2>
+    <p class="desc">Переработка выгоднее, чем прямая сдача на базе (×1.5 к цене). Открывается технологиями «Переработка I/II/III».</p>
+    <div id="craftList"></div>
+  </div>
+
+  <div class="panel" id="panel-stats">
+    <h2>Статистика</h2>
+    <div id="statsBox" style="font-size:13px; line-height:2;"></div>
+    <div style="margin-top:16px;">
+      <button class="btn danger" id="resetBtn">🗑 Сбросить прогресс</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">Заголовок</h2>
+    <p id="modalText">Текст</p>
+    <button class="btn" id="modalClose">Понятно</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================================
+   NEEDLE IN THE HAYSTACK v12 — адаптивная (ПК + мобильные)
+   ========================================================================= */
+
+const IS_MOBILE = matchMedia('(pointer: coarse)').matches
+  || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+const CONFIG = {
+  totalNeedles: 24,
+  saveKey: 'nih_save_v12',
+  themeKey: 'nih_theme',
+  worldW: 1400, worldH: 1050,
+  playerRadius: 26, playerSpeed: 240,
+  carryBase: 15,
+  haySellPrice: 2,
+  hayPilesCount: 10,
+  hayPerPile: 6,
+  pileReplenishTime: 12,
+  actionRadius: 80,
+  baseRect: { x: 1090, y: 360, w: 270, h: 330 },
+  collectBase: 2,
+  xpPerHay: 1,
+  xpBase: 80,
+  xpMult: 1.5,
+  // Мобильные оптимизации
+  mobileParticlesLimit: 4,     // меньше частиц на телефоне
+  mobileFxEnabled: false,      // отключить свечения
+};
+
+const storage = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+  remove(k) { try { localStorage.removeItem(k); return true; } catch (e) { return false; } },
+};
+
+const $ = (s) => { try { return document.querySelector(s); } catch (e) { return null; } };
+const $$ = (s) => { try { return document.querySelectorAll(s); } catch (e) { return []; } };
+const fmt = (n) => {
+  if (n < 1000) return Math.floor(n).toString();
+  if (n < 1e6) return (n / 1e3).toFixed(1) + 'K';
+  if (n < 1e9) return (n / 1e6).toFixed(2) + 'M';
+  if (n < 1e12) return (n / 1e9).toFixed(2) + 'B';
+  return (n / 1e12).toFixed(2) + 'T';
+};
+const fmtInt = (n) => Math.floor(n).toLocaleString('ru-RU');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function safe(fn, name) {
+  try { return fn(); }
+  catch (e) {
+    console.error('[SAFE]', name, e);
+    if (window.__showError) window.__showError(name + ': ' + e.message);
+    return null;
+  }
+}
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function getAutoMultiplier() {
+  if (S.tech['auto3']) return 1.0;
+  if (S.tech['auto2']) return 0.5;
+  if (S.tech['auto1']) return 0.25;
+  return 0;
+}
+
+/* ---------- ИНСТРУМЕНТЫ ---------- */
+const TOOLS = {
+  shovel:     { name: 'Лопата', icon: '🥄', bonusCarry: 0.3, bonusSpeed: 0.2, bonusWalk: 0, bonusRadius: 0, bonusText: '+30% вместимости · +20% скорости сбора' },
+  bucket:     { name: 'Ведро',  icon: '🪣', bonusCarry: 0.2, bonusSpeed: 0,   bonusWalk: 0, bonusRadius: 0, bonusText: '+20% вместимости' },
+  wheelbarrow:{ name: 'Тачка',  icon: '🛒', bonusCarry: 0.8, bonusSpeed: 0,   bonusWalk: 0.15, bonusRadius: 0, bonusText: '+80% вместимости · +15% ходьбы' },
+  pitchfork:  { name: 'Вилы',   icon: '🔱', bonusCarry: 0,   bonusSpeed: 0.4, bonusWalk: 0, bonusRadius: 0, bonusText: '+40% скорости сбора' },
+  vacuum:     { name: 'Пылесос',icon: '🌀', bonusCarry: 0,   bonusSpeed: 0.8, bonusWalk: 0, bonusRadius: 50, bonusText: '+80% скорости сбора · +50 радиус' },
+};
+
+function getActiveTool() {
+  const id = S.equippedTool;
+  if (!id || !TOOLS[id]) return null;
+  const lvl = S.shop[id] || 0;
+  if (lvl <= 0) return null;
+  return { id, ...TOOLS[id], level: lvl };
+}
+function getEquipmentBonus() {
+  const tool = getActiveTool();
+  if (!tool) return { carry: 0, speed: 0, walk: 0, radius: 0 };
+  const lvl = tool.level;
+  return {
+    carry: (tool.bonusCarry || 0) * lvl,
+    speed: (tool.bonusSpeed || 0) * lvl,
+    walk: (tool.bonusWalk || 0) * lvl,
+    radius: (tool.bonusRadius || 0) * lvl,
+  };
+}
+function getEffectiveCarryMax() {
+  const bonus = getEquipmentBonus();
+  return Math.floor(S.carryMax * (1 + bonus.carry));
+}
+function getCollectAmount() {
+  const bonus = getEquipmentBonus();
+  return Math.max(CONFIG.collectBase, Math.floor(CONFIG.collectBase * (1 + bonus.speed)));
+}
+function getWalkSpeed() {
+  const bonus = getEquipmentBonus();
+  return CONFIG.playerSpeed * (1 + S.playerSpeedBonus + bonus.walk);
+}
+function getActionRadius() {
+  const bonus = getEquipmentBonus();
+  return CONFIG.actionRadius + bonus.radius;
+}
+
+/* ---------- ГЕНЕРАЦИЯ КУЧ ---------- */
+function makeHayPiles() {
+  const piles = [];
+  const W = CONFIG.worldW, H = CONFIG.worldH;
+  const base = CONFIG.baseRect;
+  let tries = 0;
+  while (piles.length < CONFIG.hayPilesCount && tries < 500) {
+    tries++;
+    const x = 100 + Math.random() * (W - 200);
+    const y = 100 + Math.random() * (H - 200);
+    if (x + 60 > base.x && x - 60 < base.x + base.w &&
+        y + 60 > base.y && y - 60 < base.y + base.h) continue;
+    if (Math.hypot(x - 250, y - 525) < 160) continue;
+    let ok = true;
+    for (const p of piles) if (Math.hypot(p.x - x, p.y - y) < 140) { ok = false; break; }
+    if (!ok) continue;
+    piles.push({
+      x, y, amount: CONFIG.hayPerPile, max: CONFIG.hayPerPile,
+      lastRefresh: Date.now(), wobble: Math.random() * Math.PI * 2,
+    });
+  }
+  return piles;
+}
+
+/* ---------- СОСТОЯНИЕ ---------- */
+const defaultState = () => ({
+  hay: 0, money: 0, needles: 0,
+  strawsTotal: 0, manualSearches: 0, searchProgress: 0,
+  shop: {}, tech: {},
+  equippedTool: null,
+  workers: 0, workerCost: 50,
+  lastTick: Date.now(), playTime: 0, totalMoneyEarned: 0,
+  playerLv: 1, playerXP: 0, playerSpeedBonus: 0, carryMax: CONFIG.carryBase,
+  world: { hayPiles: makeHayPiles(), carried: 0 },
+  totalDeposited: 0,
+});
+
+function loadState() {
+  try {
+    const raw = storage.get(CONFIG.saveKey);
+    if (!raw) return defaultState();
+    const saved = JSON.parse(raw);
+    const base = defaultState();
+    const merged = { ...base, ...saved, shop: saved.shop || {}, tech: saved.tech || {} };
+    if (!merged.world) merged.world = base.world;
+    if (!Array.isArray(merged.world.hayPiles) || merged.world.hayPiles.length === 0) {
+      merged.world.hayPiles = makeHayPiles();
+    }
+    merged.world.carried = merged.world.carried || 0;
+    if (merged.equippedTool) {
+      const lvl = merged.shop[merged.equippedTool] || 0;
+      if (lvl <= 0) merged.equippedTool = null;
+    }
+    return merged;
+  } catch (e) {
+    console.warn('[loadState]', e);
+    return defaultState();
+  }
+}
+
+let S = loadState();
+
+/* ---------- АУДИО ---------- */
+const AC = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio() {
+  try {
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { /* silent */ }
+}
+function beep(freq, dur = 0.08, type = 'sine', vol = 0.08) {
+  if (!audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch (e) { /* silent */ }
+}
+const SFX = {
+  pick:    () => beep(520, 0.06, 'square', 0.06),
+  deposit: () => { beep(660, 0.08, 'sine', 0.12); setTimeout(() => beep(880, 0.1, 'sine', 0.12), 60); },
+  buy:     () => { beep(660, 0.08, 'sine', 0.12); setTimeout(() => beep(990, 0.1, 'sine', 0.12), 60); },
+  equip:   () => { beep(440, 0.08, 'triangle', 0.15); setTimeout(() => beep(660, 0.1, 'triangle', 0.15), 70); },
+  error:   () => beep(180, 0.15, 'sawtooth', 0.1),
+  needle:  () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.15, 'sine', 0.16), i * 100)); },
+};
+
+/* ---------- ЭКОНОМИКА ---------- */
+const SHOP_ITEMS = [
+  { id: 'shovel',   name: 'Лопата',           icon: '🥄', desc: '+3 сена/сек',             cost: 30,     mult: 1.18, max: 25, effect: { straws: 3 } },
+  { id: 'bucket',   name: 'Ведро',            icon: '🪣', desc: '+8 сена/сек',             cost: 120,    mult: 1.20, max: 25, effect: { straws: 8 } },
+  { id: 'wheelbarrow', name: 'Тачка',         icon: '🛒', desc: '+25 сена/сек',            cost: 500,    mult: 1.22, max: 25, effect: { straws: 25 } },
+  { id: 'pitchfork',name: 'Вилы',             icon: '🔱', desc: '+60 сена/сек',            cost: 2000,   mult: 1.24, max: 25, effect: { straws: 60 } },
+  { id: 'vacuum',   name: 'Пылесос',          icon: '🌀', desc: '+150 сена/сек',           cost: 8000,   mult: 1.26, max: 25, effect: { straws: 150 } },
+  { id: 'metalldet',name: 'Металлоискатель',  icon: '📡', desc: '+1% шанс найти иголку',   cost: 20000,  mult: 1.28, max: 20, effect: { chance: 0.01 } },
+  { id: 'conveyor', name: 'Конвейер',         icon: '➡️', desc: '+500 сена/сек',           cost: 50000,  mult: 1.28, max: 25, effect: { straws: 500 } },
+  { id: 'baler',    name: 'Пресс-подборщик',  icon: '📦', desc: '+1500 сена/сек',          cost: 150000, mult: 1.30, max: 25, effect: { straws: 1500 } },
+  { id: 'scanner',  name: 'Сканер',           icon: '🔬', desc: '+3% шанс найти иголку',   cost: 400000, mult: 1.32, max: 20, effect: { chance: 0.03 } },
+  { id: 'robot',    name: 'Робо-манипулятор', icon: '🤖', desc: '+5000 сена/сек',          cost: 1000000,mult: 1.32, max: 25, effect: { straws: 5000 } },
+  { id: 'drone',    name: 'Дрон-разведчик',   icon: '🛸', desc: '+5% шанс найти иголку',   cost: 3000000,mult: 1.35, max: 20, effect: { chance: 0.05 } },
+  { id: 'sorter',   name: 'Система сортировки',icon: '⚙️', desc: '+25000 сена/сек',        cost: 10000000,mult: 1.35, max: 25, effect: { straws: 25000 } },
+];
+
+const TECH_ITEMS = [
+  { id: 'auto1', name: 'Автоматизация I',  icon: '🔧', desc: 'Открывает 25% пассивного дохода',   cost: 5,  category: 'auto', effect: { auto: 0.25 } },
+  { id: 'auto2', name: 'Автоматизация II', icon: '⚙️', desc: 'Увеличивает пассив до 50%',         cost: 10, category: 'auto', effect: { auto: 0.5 }, requires: 'auto1' },
+  { id: 'auto3', name: 'Автоматизация III',icon: '🏭', desc: 'Полный пассивный доход (100%)',      cost: 16, category: 'auto', effect: { auto: 1.0 }, requires: 'auto2' },
+  { id: 't1',  name: 'Быстрые руки',       icon: '✋', desc: '+30% к ручному сбору',       cost: 3,  effect: { manualMult: 0.3 } },
+  { id: 't2',  name: 'Опытный глаз',       icon: '👁', desc: '+20% к шансу найти иголку',   cost: 6,  effect: { chanceMult: 0.2 } },
+  { id: 't3',  name: 'Организация труда',  icon: '📋', desc: '+15% к доходу сена',          cost: 8,  effect: { strawsMult: 0.15 } },
+  { id: 't4',  name: 'Переработка I',      icon: '⚙️', desc: 'Открывает сенную массу',     cost: 9,  effect: { unlockCraft: 'mass' } },
+  { id: 't5',  name: 'Электрификация',     icon: '⚡', desc: '+25% к доходу сена',          cost: 12, effect: { strawsMult: 0.25 } },
+  { id: 't6',  name: 'Мастер-поисковик',   icon: '🏆', desc: '+40% к шансу найти иголку',   cost: 14, effect: { chanceMult: 0.4 } },
+  { id: 't7',  name: 'Переработка II',     icon: '🏭', desc: 'Открывает тюки и кирпичи',   cost: 16, effect: { unlockCraft: 'bales' } },
+  { id: 't8',  name: 'Логистика',          icon: '🚚', desc: '+35% к доходу сена',          cost: 18, effect: { strawsMult: 0.35 } },
+  { id: 't9',  name: 'Переработка III',    icon: '📄', desc: 'Открывает бумагу и пеллеты',  cost: 20, effect: { unlockCraft: 'paper' } },
+  { id: 't10', name: 'Промышленная революция', icon: '🏭', desc: '+80% доход, +20% шанс',   cost: 22, effect: { strawsMult: 0.8, chanceMult: 0.2 } },
+];
+
+const CRAFT_RECIPES = [
+  { id: 'mass',  name: 'Сенная масса',      desc: '100 сена → 300 денег',     hay: 100,  money: 300,   unlock: 'mass' },
+  { id: 'bales', name: 'Прессованные тюки', desc: '500 сена → 1800 денег',    hay: 500,  money: 1800,  unlock: 'bales' },
+  { id: 'brick', name: 'Экокирпичи',        desc: '2000 сена → 9000 денег',   hay: 2000, money: 9000,  unlock: 'bales' },
+  { id: 'paper', name: 'Бумага',            desc: '10000 сена → 60000 денег', hay: 10000,money: 60000, unlock: 'paper' },
+  { id: 'pellets',name: 'Пеллеты',          desc: '50000 сена → 400000 денег',hay: 50000,money: 400000,unlock: 'paper' },
+];
+
+function computeProduction() {
+  let straws = 0, chanceBonus = 0;
+  SHOP_ITEMS.forEach(item => {
+    const lvl = S.shop[item.id] || 0;
+    if (lvl <= 0) return;
+    if (item.effect.straws) straws += item.effect.straws * lvl;
+    if (item.effect.chance) chanceBonus += item.effect.chance * lvl;
+  });
+  const autoMult = getAutoMultiplier();
+  straws *= autoMult;
+  let strawsMult = 1, chanceMult = 1;
+  TECH_ITEMS.forEach(t => {
+    if (!S.tech[t.id]) return;
+    if (t.effect.strawsMult) strawsMult += t.effect.strawsMult;
+    if (t.effect.chanceMult) chanceMult += t.effect.chanceMult;
+  });
+  straws *= strawsMult;
+  return { straws, chanceBonus: chanceBonus * chanceMult, autoMult };
+}
+
+function passiveIncome(dt) {
+  const prod = computeProduction();
+  const gained = prod.straws * dt;
+  if (gained > 0) { S.hay += gained; S.strawsTotal += gained; }
+  const autoChance = prod.chanceBonus * dt * prod.autoMult;
+  if (autoChance > 0) {
+    S.searchProgress += autoChance;
+    if (S.searchProgress >= 1) { S.searchProgress -= 1; findNeedle(true); }
+  }
+}
+
+function findNeedle(auto = false) {
+  if (S.needles >= CONFIG.totalNeedles) return;
+  S.needles++;
+  const reward = Math.floor(30 * Math.pow(1.7, S.needles));
+  S.money += reward;
+  S.totalMoneyEarned += reward;
+  S.searchProgress = 0;
+  SFX.needle();
+  log(`🧵 Найдена иголка #${S.needles}! +${fmt(reward)} 💰`, 'ok');
+  toast(`🧵 Иголка #${S.needles}/${CONFIG.totalNeedles}! +${fmt(reward)} денег`);
+  safe(updateHUD, 'updateHUD');
+  safe(renderTech, 'renderTech');
+  safe(renderCraft, 'renderCraft');
+  safe(renderShop, 'renderShop');
+  if (S.needles >= CONFIG.totalNeedles) {
+    showModal('🎉 Все иголки найдены!', 'Вы собрали все 24 иголки. Двери склада со скрипом открываются...');
+  }
+}
+
+/* ---------- МИР ---------- */
+const world = {
+  canvas: null, ctx: null,
+  player: { x: 250, y: 525, dir: 0, animPhase: 0 },
+  keys: { up: false, down: false, left: false, right: false },
+  dpad: { up: false, down: false, left: false, right: false },
+  time: 0, floatTexts: [], particles: [], lastFrame: 0,
+};
+let moveTo = { x: 0, y: 0, active: false };
+// Автопилот на мобильных: тап по куче → идти к ней и собрать
+let autoTarget = null;  // { type: 'collect'|'deposit', x, y }
+let shopClickLock = false;
+
+function initWorld() {
+  world.canvas = document.getElementById('worldCanvas');
+  if (!world.canvas) { console.error('[initWorld] canvas not found'); return; }
+  world.ctx = world.canvas.getContext('2d', { alpha: false });
+  if (!world.ctx) { console.error('[initWorld] ctx null'); return; }
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['arrowup','w','ц'].includes(k)) { world.keys.up = true; e.preventDefault(); }
+    else if (['arrowdown','s','ы'].includes(k)) { world.keys.down = true; e.preventDefault(); }
+    else if (['arrowleft','a','ф'].includes(k)) { world.keys.left = true; e.preventDefault(); }
+    else if (['arrowright','d','в'].includes(k)) { world.keys.right = true; e.preventDefault(); }
+    else if (k === ' ' || k === 'e' || k === 'у') { e.preventDefault(); performAction(); }
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (['arrowup','w','ц'].includes(k)) world.keys.up = false;
+    else if (['arrowdown','s','ы'].includes(k)) world.keys.down = false;
+    else if (['arrowleft','a','ф'].includes(k)) world.keys.left = false;
+    else if (['arrowright','d','в'].includes(k)) world.keys.right = false;
+  });
+
+  // Клик / тап по канвасу — автопилот
+  world.canvas.addEventListener('pointerdown', (e) => {
+    const r = world.canvas.getBoundingClientRect();
+    const wx = (e.clientX - r.left) * (CONFIG.worldW / r.width);
+    const wy = (e.clientY - r.top) * (CONFIG.worldH / r.height);
+    // Найти ближайшую кучу или базу
+    handleCanvasTap(wx, wy);
+  });
+
+  $$('.mobileControls .dpad button').forEach(btn => {
+    const dir = btn.dataset.dir;
+    const on = (e) => { e.preventDefault(); world.dpad[dir] = true; autoTarget = null; };
+    const off = (e) => { e.preventDefault(); world.dpad[dir] = false; };
+    btn.addEventListener('pointerdown', on);
+    btn.addEventListener('pointerup', off);
+    btn.addEventListener('pointerleave', off);
+    btn.addEventListener('pointercancel', off);
+  });
+  const ab = document.getElementById('actionBtn');
+  if (ab) ab.addEventListener('pointerdown', (e) => { e.preventDefault(); performAction(); });
+
+  world.lastFrame = performance.now();
+  requestAnimationFrame(worldLoop);
+}
+
+// Тап по канвасу — умное поведение
+function handleCanvasTap(wx, wy) {
+  // Проверяем: попал ли тап по базе?
+  const b = CONFIG.baseRect;
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  if (wx > b.x && wx < b.x + b.w && wy > b.y && wy < b.y + b.h) {
+    if (S.world.carried > 0) {
+      autoTarget = { type: 'deposit', x: cx, y: cy };
+      showWorldMsg('Иду к базе...');
+    } else {
+      showWorldMsg('Нечего сдавать');
+    }
+    return;
+  }
+  // Проверяем: попал ли по куче сена?
+  let closest = null, closestD = Infinity;
+  for (const pile of S.world.hayPiles) {
+    if (pile.amount <= 0) continue;
+    const d = Math.hypot(wx - pile.x, wy - pile.y);
+    if (d < closestD) { closestD = d; closest = pile; }
+  }
+  if (closest && closestD < 80) {
+    if (S.world.carried >= getEffectiveCarryMax()) {
+      showWorldMsg('Руки полны! Идите к базе.');
+      return;
+    }
+    autoTarget = { type: 'collect', pile: closest, x: closest.x, y: closest.y };
+    showWorldMsg('Иду к сену...');
+    return;
+  }
+  // Иначе просто идём к точке
+  autoTarget = null;
+  moveTo = { x: wx, y: wy, active: true };
+}
+
+function worldLoop(now) {
+  const dt = Math.min(0.05, (now - world.lastFrame) / 1000);
+  world.lastFrame = now;
+  world.time += dt;
+  updatePlayer(dt);
+  updateHayPiles(dt);
+  updateWorldParticles(dt);
+  safe(renderWorld, 'renderWorld');
+  requestAnimationFrame(worldLoop);
+}
+
+function updatePlayer(dt) {
+  const p = world.player;
+  let dx = 0, dy = 0;
+  const useDpad = world.dpad.up || world.dpad.down || world.dpad.left || world.dpad.right;
+  if (useDpad) {
+    if (world.dpad.up) dy -= 1;
+    if (world.dpad.down) dy += 1;
+    if (world.dpad.left) dx -= 1;
+    if (world.dpad.right) dx += 1;
+    moveTo.active = false;
+  } else if (autoTarget) {
+    // Автопилот
+    const ddx = autoTarget.x - p.x, ddy = autoTarget.y - p.y;
+    const d = Math.hypot(ddx, ddy);
+    const stopDist = autoTarget.type === 'collect' ? 50 : 60;
+    if (d < stopDist) {
+      // Дошли — выполняем действие
+      if (autoTarget.type === 'collect') {
+        const pile = autoTarget.pile;
+        if (pile && pile.amount > 0 && S.world.carried < getEffectiveCarryMax()) {
+          collectHay(pile);
+        }
+      } else if (autoTarget.type === 'deposit') {
+        if (S.world.carried > 0) depositHay();
+      }
+      autoTarget = null;
+    } else {
+      dx = ddx / d;
+      dy = ddy / d;
+    }
+  } else {
+    if (world.keys.up) dy -= 1;
+    if (world.keys.down) dy += 1;
+    if (world.keys.left) dx -= 1;
+    if (world.keys.right) dx += 1;
+    if (dx === 0 && dy === 0 && moveTo.active) {
+      const ddx = moveTo.x - p.x, ddy = moveTo.y - p.y;
+      const d = Math.hypot(ddx, ddy);
+      if (d < 10) moveTo.active = false;
+      else { dx = ddx / d; dy = ddy / d; }
+    } else if (dx !== 0 || dy !== 0) {
+      moveTo.active = false;
+    }
+  }
+  const len = Math.hypot(dx, dy);
+  if (len > 0) {
+    dx /= len; dy /= len;
+    const sp = getWalkSpeed() * dt;
+    p.x = clamp(p.x + dx * sp, CONFIG.playerRadius + 10, CONFIG.worldW - CONFIG.playerRadius - 10);
+    p.y = clamp(p.y + dy * sp, CONFIG.playerRadius + 10, CONFIG.worldH - CONFIG.playerRadius - 10);
+    p.dir = Math.atan2(dy, dx);
+    p.animPhase += dt * 12;
+  }
+}
+
+function updateHayPiles(dt) {
+  const now = Date.now();
+  for (const pile of S.world.hayPiles) {
+    pile.wobble += dt * 2;
+    if (pile.amount < pile.max && now - pile.lastRefresh > CONFIG.pileReplenishTime * 1000) {
+      pile.amount = pile.max;
+      pile.lastRefresh = now;
+    }
+  }
+}
+
+function updateWorldParticles(dt) {
+  const limit = IS_MOBILE ? CONFIG.mobileParticlesLimit : 9999;
+  while (world.particles.length > limit) world.particles.shift();
+  for (let i = world.particles.length - 1; i >= 0; i--) {
+    const pt = world.particles[i];
+    pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vy += 60 * dt; pt.life -= dt;
+    if (pt.life <= 0) world.particles.splice(i, 1);
+  }
+  for (let i = world.floatTexts.length - 1; i >= 0; i--) {
+    const ft = world.floatTexts[i];
+    ft.y -= 30 * dt; ft.life -= dt;
+    if (ft.life <= 0) world.floatTexts.splice(i, 1);
+  }
+}
+
+function renderWorld() {
+  if (!world.ctx) return;
+  const ctx = world.ctx;
+  const W = CONFIG.worldW, H = CONFIG.worldH;
+
+  const bg = ctx.createRadialGradient(W/2, H/2, 100, W/2, H/2, W);
+  bg.addColorStop(0, '#6a5628');
+  bg.addColorStop(1, '#3a2e14');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Шахматный пол — рисуем только если не мобилка (или реже)
+  ctx.save();
+  ctx.globalAlpha = 0.1;
+  for (let gx = 0; gx < W; gx += 100) {
+    for (let gy = 0; gy < H; gy += 100) {
+      ctx.fillStyle = ((gx + gy) / 100) % 2 === 0 ? '#000' : '#fff';
+      ctx.fillRect(gx, gy, 100, 100);
+    }
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = '#1a1408';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, W - 10, H - 10);
+
+  // База
+  const b = CONFIG.baseRect;
+  ctx.fillStyle = 'rgba(242,179,61,0.25)';
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = '#f2b33d';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([14, 8]);
+  ctx.strokeRect(b.x, b.y, b.w, b.h);
+  ctx.setLineDash([]);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#f2b33d';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.fillText('🏠 БАЗА', b.x + b.w/2, b.y + b.h/2 - 40);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.fillText('Сдай сено', b.x + b.w/2, b.y + b.h/2 + 20);
+  ctx.fillText(`💰 ${CONFIG.haySellPrice} за 1`, b.x + b.w/2, b.y + b.h/2 + 55);
+
+  const actionR = getActionRadius();
+  if (actionR > CONFIG.actionRadius) {
+    const p = world.player;
+    ctx.strokeStyle = 'rgba(242,179,61,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, actionR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Кучи сена
+  for (const pile of S.world.hayPiles) {
+    const x = pile.x, y = pile.y;
+    if (pile.amount <= 0) {
+      ctx.strokeStyle = 'rgba(212,168,67,0.3)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 32, 0, Math.PI * 2);
+      ctx.stroke();
+      continue;
+    }
+    const ratio = pile.amount / pile.max;
+    const r = 22 + 22 * ratio;
+    const wobble = Math.sin(pile.wobble) * 3;
+
+    // Тень (упрощена на мобильных)
+    if (!IS_MOBILE) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(x, y + r * 0.6, r * 1.1, r * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Куча (градиент заменён на сплошной цвет на мобильных)
+    if (IS_MOBILE) {
+      ctx.fillStyle = '#d4a843';
+    } else {
+      const grad = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.2, x, y, r);
+      grad.addColorStop(0, '#f5d878');
+      grad.addColorStop(1, '#a07a1c');
+      ctx.fillStyle = grad;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y + wobble, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Травинки (только на десктопе)
+    if (!IS_MOBILE) {
+      ctx.strokeStyle = 'rgba(120,80,10,0.7)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + pile.wobble * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(a) * r * 0.3, y + Math.sin(a) * r * 0.3);
+        ctx.lineTo(x + Math.cos(a) * r * 0.95, y + Math.sin(a) * r * 0.95);
+        ctx.stroke();
+      }
+    }
+
+    // Счётчик
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(pile.amount, x, y - r - 12);
+    ctx.fillText(pile.amount, x, y - r - 12);
+  }
+
+  // Частицы
+  for (const pt of world.particles) {
+    ctx.globalAlpha = clamp(pt.life, 0, 1);
+    ctx.fillStyle = '#f5d878';
+    ctx.fillRect(pt.x - 2, pt.y - 2, 5, 5);
+  }
+  ctx.globalAlpha = 1;
+
+  renderPlayer(ctx);
+
+  // Всплывающие тексты
+  for (const ft of world.floatTexts) {
+    ctx.globalAlpha = clamp(ft.life, 0, 1);
+    ctx.fillStyle = ft.color;
+    ctx.font = 'bold 26px sans-serif';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText(ft.text, ft.x, ft.y);
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+
+  // Подсказка действия
+  const near = getActionTarget();
+  if (near) {
+    const p = world.player;
+    ctx.fillStyle = 'rgba(242,179,61,0.95)';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    const label = near.type === 'deposit' ? '[E] Сдать' : '[E] Собрать';
+    ctx.strokeText(label, p.x, p.y - 70);
+    ctx.fillText(label, p.x, p.y - 70);
+  }
+
+  // Автопилот-маркер
+  if (autoTarget) {
+    ctx.strokeStyle = 'rgba(111,207,111,0.8)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(autoTarget.x, autoTarget.y, 40, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function renderPlayer(ctx) {
+  const p = world.player;
+  const px = p.x, py = p.y, pr = CONFIG.playerRadius;
+  const bob = Math.sin(p.animPhase) * 3;
+  const tool = getActiveTool();
+
+  // Тень (только десктоп)
+  if (!IS_MOBILE) {
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(px, py + pr * 0.9, pr * 1.1, pr * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (tool && (tool.id === 'wheelbarrow' || tool.id === 'bucket')) {
+    drawToolInHand(ctx, tool, px, py, pr, bob, 'back');
+  }
+
+  ctx.fillStyle = '#3a7a4a';
+  ctx.beginPath();
+  ctx.arc(px, py + bob, pr, 0, Math.PI * 2);
+  ctx.fill();
+  if (!IS_MOBILE) {
+    ctx.strokeStyle = '#1f4a2a';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#f0c89a';
+  ctx.beginPath();
+  ctx.arc(px, py - pr * 0.35 + bob, pr * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#c98a1c';
+  ctx.beginPath();
+  ctx.ellipse(px, py - pr * 0.9 + bob, pr * 1.0, pr * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(px, py - pr * 1.05 + bob, pr * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ex = px + Math.cos(p.dir) * pr * 0.35;
+  const ey = py - pr * 0.35 + bob + Math.sin(p.dir) * pr * 0.35;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.arc(ex - 6, ey, 3.5, 0, Math.PI * 2);
+  ctx.arc(ex + 6, ey, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (tool) {
+    drawToolInHand(ctx, tool, px, py, pr, bob, 'front');
+  }
+
+  if (S.world.carried > 0) {
+    const carryMax = getEffectiveCarryMax();
+    const ratio = S.world.carried / carryMax;
+    const hr = pr * 0.55 + pr * 0.45 * ratio;
+    ctx.fillStyle = '#d4a843';
+    ctx.beginPath();
+    ctx.arc(px, py - pr * 1.7 + bob, hr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a6a1c';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(S.world.carried, px, py - pr * 1.7 - hr - 14 + bob);
+    ctx.fillText(S.world.carried, px, py - pr * 1.7 - hr - 14 + bob);
+  }
+}
+
+function drawToolInHand(ctx, tool, px, py, pr, bob, layer) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (tool.id === 'shovel' && layer === 'front') {
+    ctx.font = `${pr * 1.6}px sans-serif`;
+    ctx.fillText('🥄', px + pr * 0.9, py + bob);
+  } else if (tool.id === 'pitchfork' && layer === 'front') {
+    ctx.font = `${pr * 1.6}px sans-serif`;
+    ctx.fillText('🔱', px + pr * 0.9, py - pr * 0.2 + bob);
+  } else if (tool.id === 'vacuum' && layer === 'front') {
+    ctx.font = `${pr * 1.6}px sans-serif`;
+    ctx.fillText('🌀', px + pr * 0.9, py + bob);
+  } else if (tool.id === 'wheelbarrow' && layer === 'back') {
+    ctx.font = `${pr * 1.4}px sans-serif`;
+    ctx.globalAlpha = 0.7;
+    ctx.fillText('🛒', px - pr * 1.1, py + pr * 0.3 + bob);
+    ctx.globalAlpha = 1;
+  } else if (tool.id === 'bucket' && layer === 'back') {
+    ctx.font = `${pr * 1.2}px sans-serif`;
+    ctx.fillText('🪣', px - pr * 1.0, py + pr * 0.4 + bob);
+  }
+  ctx.restore();
+}
+
+/* ---------- ДЕЙСТВИЯ ---------- */
+function getActionTarget() {
+  const p = world.player;
+  const b = CONFIG.baseRect;
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  const radius = getActionRadius();
+  if (Math.hypot(p.x - cx, p.y - cy) < Math.max(b.w, b.h) / 2 + radius) {
+    return { type: 'deposit' };
+  }
+  let closest = null, closestD = Infinity;
+  for (const pile of S.world.hayPiles) {
+    if (pile.amount <= 0) continue;
+    const d = Math.hypot(p.x - pile.x, p.y - pile.y);
+    if (d < closestD) { closestD = d; closest = pile; }
+  }
+  if (closest && closestD < radius + 30) return { type: 'collect', pile: closest };
+  return null;
+}
+
+function performAction() {
+  ensureAudio();
+  const target = getActionTarget();
+  if (!target) { showWorldMsg('Подойдите к сену или к базе'); return; }
+  if (target.type === 'deposit') {
+    if (S.world.carried > 0) depositHay();
+    else showWorldMsg('Нечего сдавать');
+    return;
+  }
+  if (target.type === 'collect') {
+    if (S.world.carried >= getEffectiveCarryMax()) {
+      showWorldMsg('Руки полны! Отнесите на базу.');
+      return;
+    }
+    collectHay(target.pile);
+  }
+}
+
+function collectHay(pile) {
+  const carryMax = getEffectiveCarryMax();
+  const collectAmount = getCollectAmount();
+  const take = Math.min(carryMax - S.world.carried, pile.amount, collectAmount);
+  if (take <= 0) return;
+  pile.amount -= take;
+  pile.lastRefresh = Date.now();
+  S.world.carried += take;
+  S.manualSearches++;
+  SFX.pick();
+  const particleCount = IS_MOBILE ? 4 : 8;
+  for (let i = 0; i < particleCount; i++) {
+    world.particles.push({
+      x: pile.x, y: pile.y,
+      vx: (Math.random() - 0.5) * 120,
+      vy: -80 - Math.random() * 80,
+      life: 0.6 + Math.random() * 0.4,
+    });
+  }
+  world.floatTexts.push({ x: pile.x, y: pile.y - 40, text: `+${take} 🌾`, color: '#f2b33d', life: 1 });
+  S.searchProgress += 0.0005 * take;
+  if (S.searchProgress >= 1) findNeedle();
+  safe(updateHUD, 'updateHUD');
+}
+
+function depositHay() {
+  const amount = S.world.carried;
+  if (amount <= 0) return;
+  const pricePer = CONFIG.haySellPrice * (1 + (S.playerLv - 1) * 0.03);
+  const money = Math.floor(amount * pricePer);
+  S.world.carried = 0;
+  S.money += money;
+  S.totalMoneyEarned += money;
+  S.hay += amount;
+  S.totalDeposited += amount;
+  addXP(amount * CONFIG.xpPerHay);
+  SFX.deposit();
+  const p = world.player;
+  for (let i = 0; i < 12; i++) {
+    world.particles.push({
+      x: p.x + (Math.random() - 0.5) * 40, y: p.y - 30,
+      vx: (Math.random() - 0.5) * 140, vy: -80 - Math.random() * 100, life: 0.8,
+    });
+  }
+  world.floatTexts.push({ x: p.x, y: p.y - 50, text: `+${money} 💰`, color: '#6fcf6f', life: 1 });
+  log(`📦 Сдано ${amount} сена → ${money} 💰`, 'ok');
+  safe(updateHUD, 'updateHUD');
+  safe(renderShop, 'renderShop');
+  safe(renderCraft, 'renderCraft');
+}
+
+function addXP(xp) {
+  S.playerXP += xp;
+  let leveled = false;
+  while (S.playerXP >= xpForLevel(S.playerLv)) {
+    S.playerXP -= xpForLevel(S.playerLv);
+    S.playerLv++;
+    S.playerSpeedBonus += 0.03;
+    if (S.playerLv % 4 === 0) S.carryMax += 3;
+    leveled = true;
+  }
+  if (leveled) {
+    toast(`🎉 Уровень ${S.playerLv}! Скорость +3%`);
+    SFX.needle();
+    safe(updateHUD, 'updateHUD');
+  }
+}
+function xpForLevel(lv) { return Math.floor(CONFIG.xpBase * Math.pow(CONFIG.xpMult, lv - 1)); }
+
+function showWorldMsg(msg) {
+  const el = document.getElementById('worldMsg');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(showWorldMsg._t);
+  showWorldMsg._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* ---------- МАГАЗИН ---------- */
+function itemCost(item) {
+  return Math.floor(item.cost * Math.pow(item.mult, S.shop[item.id] || 0));
+}
+
+function renderShop() {
+  const grid = document.getElementById('shopGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const autoMult = getAutoMultiplier();
+  SHOP_ITEMS.forEach(item => {
+    const lvl = S.shop[item.id] || 0;
+    const cost = itemCost(item);
+    const maxed = lvl >= item.max;
+    const affordable = S.money >= cost && !maxed;
+    const isTool = !!TOOLS[item.id];
+    const equipped = isTool && S.equippedTool === item.id;
+    const owned = lvl > 0;
+    const hasStraws = !!item.effect.straws;
+    const autoLocked = hasStraws && autoMult === 0;
+
+    let bonusText = '';
+    if (isTool) {
+      bonusText = `<div class="bonus">${TOOLS[item.id].bonusText} за уровень</div>`;
+    } else if (autoLocked) {
+      bonusText = `<div class="bonus" style="color:#e05555">⚠ Без автоматизации пассив = 0</div>`;
+    } else if (autoMult > 0 && hasStraws) {
+      bonusText = `<div class="bonus">активно на ${Math.round(autoMult * 100)}%</div>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'card' + (maxed ? ' owned' : '') + (equipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="head">
+        <div>
+          <div class="name">${item.name}${equipped ? '<span class="equippedTag">В РУКЕ</span>' : ''}</div>
+          <div class="desc">${item.desc}</div>
+          ${bonusText}
+        </div>
+        <div class="icon">${item.icon}</div>
+      </div>
+      <div class="price">
+        <span>${maxed ? '✅ Максимум' : '💰 ' + fmt(cost)}</span>
+        <span class="cnt">Ур. ${lvl}/${item.max}</span>
+      </div>
+      <div class="btnRow">
+        <button ${maxed || !affordable ? 'disabled' : ''} data-buy="${item.id}">
+          ${maxed ? 'Куплено' : (affordable ? 'Купить' : 'Не хватает')}
+        </button>
+        ${isTool && owned ? `
+          <button class="equipBtn ${equipped ? 'on' : ''}" data-equip="${item.id}">
+            ${equipped ? '✓ В руке' : 'Экипировать'}
+          </button>` : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  grid.querySelectorAll('button[data-buy]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (shopClickLock) return;
+      shopClickLock = true;
+      try { buyItem(btn.dataset.buy); }
+      finally { setTimeout(() => { shopClickLock = false; }, 120); }
+    });
+  });
+  grid.querySelectorAll('button[data-equip]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleEquip(btn.dataset.equip);
+    });
+  });
+}
+
+function buyItem(id) {
+  const item = SHOP_ITEMS.find(i => i.id === id);
+  if (!item) return;
+  const lvl = S.shop[id] || 0;
+  if (lvl >= item.max) return;
+  const cost = itemCost(item);
+  if (S.money < cost) { SFX.error(); return; }
+  S.money -= cost;
+  S.shop[id] = lvl + 1;
+  SFX.buy();
+  log(`🛒 Куплено: ${item.name} (Ур. ${lvl + 1})`, 'ok');
+  if (TOOLS[id]) {
+    S.equippedTool = id;
+    SFX.equip();
+    toast(`${TOOLS[id].icon} ${TOOLS[id].name} экипирован!`);
+  }
+  safe(updateHUD, 'updateHUD');
+  safe(renderShop, 'renderShop');
+}
+
+function toggleEquip(id) {
+  if (!TOOLS[id]) return;
+  const lvl = S.shop[id] || 0;
+  if (lvl <= 0) return;
+  if (S.equippedTool === id) {
+    S.equippedTool = null;
+    toast(`Снят: ${TOOLS[id].name}`);
+  } else {
+    S.equippedTool = id;
+    SFX.equip();
+    toast(`${TOOLS[id].icon} ${TOOLS[id].name} в руке!`);
+  }
+  log(`🔧 ${S.equippedTool ? 'Экипирован: ' + TOOLS[S.equippedTool].name : 'Инструмент снят'}`, 'ok');
+  safe(updateHUD, 'updateHUD');
+  safe(renderShop, 'renderShop');
+}
+
+function renderTech() {
+  const grid = document.getElementById('techGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  TECH_ITEMS.forEach(t => {
+    const owned = !!S.tech[t.id];
+    const reqOk = !t.requires || !!S.tech[t.requires];
+    const canBuy = !owned && S.needles >= t.cost && reqOk;
+    const isAuto = t.category === 'auto';
+    const card = document.createElement('div');
+    card.className = 'card' + (owned ? ' owned' : '') + (!owned && !canBuy ? ' locked' : '');
+    if (isAuto && !owned) card.style.borderColor = '#f2b33d';
+    let reqText = '';
+    if (t.requires && !S.tech[t.requires]) {
+      reqText = `<div style="font-size:10px;color:#e05555">требуется: ${TECH_ITEMS.find(x => x.id === t.requires)?.name}</div>`;
+    }
+    let categoryBadge = isAuto ? `<div style="font-size:10px;color:#f2b33d;font-weight:700">🔧 АВТОМАТИЗАЦИЯ</div>` : '';
+    card.innerHTML = `
+      <div class="head">
+        <div>
+          ${categoryBadge}
+          <div class="name">${t.name}</div>
+          <div class="desc">${t.desc}</div>
+          ${reqText}
+        </div>
+        <div class="icon">${t.icon}</div>
+      </div>
+      <div class="price">
+        <span>🧵 ${t.cost} иголок</span>
+        <span class="cnt">${owned ? '✅ Изучено' : (canBuy ? 'Доступно' : (reqOk ? 'Не хватает' : '🔒'))}</span>
+      </div>
+      <button ${owned || !canBuy ? 'disabled' : ''} data-tech="${t.id}">
+        ${owned ? 'Изучено' : 'Изучить'}
+      </button>`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('button[data-tech]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      buyTech(btn.dataset.tech);
+    });
+  });
+}
+
+function buyTech(id) {
+  const t = TECH_ITEMS.find(x => x.id === id);
+  if (!t || S.tech[id]) return;
+  if (t.requires && !S.tech[t.requires]) {
+    toast('Сначала изучите предыдущую технологию');
+    SFX.error();
+    return;
+  }
+  if (S.needles < t.cost) { SFX.error(); return; }
+  S.tech[id] = true;
+  SFX.buy();
+  if (t.category === 'auto') {
+    const newMult = Math.round(getAutoMultiplier() * 100);
+    log(`🔧 ${t.name}! Пассивный доход: ${newMult}%`, 'ok');
+    toast(`🔧 ${t.name}! Пассив теперь ${newMult}%`);
+  } else {
+    log(`🌳 Изучена технология: ${t.name}`, 'ok');
+    toast(`🌳 Технология: ${t.name}`);
+  }
+  safe(updateHUD, 'updateHUD');
+  safe(renderTech, 'renderTech');
+  safe(renderCraft, 'renderCraft');
+  safe(renderShop, 'renderShop');
+}
+
+function renderCraft() {
+  const list = document.getElementById('craftList');
+  if (!list) return;
+  list.innerHTML = '';
+  CRAFT_RECIPES.forEach(r => {
+    const unlocked = (r.unlock === 'mass' && S.tech['t4']) ||
+                     (r.unlock === 'bales' && S.tech['t7']) ||
+                     (r.unlock === 'paper' && S.tech['t9']);
+    const canDo = unlocked && S.hay >= r.hay;
+    const row = document.createElement('div');
+    row.className = 'craftRow';
+    row.innerHTML = `
+      <div class="info">
+        <div class="n">${r.name} ${!unlocked ? '🔒' : ''}</div>
+        <div class="d">${r.desc} ${!unlocked ? '— требуется технология' : ''}</div>
+      </div>
+      <button class="btn ${!canDo ? 'ghost' : ''}" ${!canDo ? 'disabled' : ''} data-craft="${r.id}">
+        ${unlocked ? (canDo ? 'Переработать' : 'Мало сена') : 'Заблокировано'}
+      </button>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button[data-craft]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      doCraft(btn.dataset.craft);
+    });
+  });
+}
+
+function doCraft(id) {
+  const r = CRAFT_RECIPES.find(x => x.id === id);
+  if (!r || S.hay < r.hay) return;
+  S.hay -= r.hay;
+  S.money += r.money;
+  S.totalMoneyEarned += r.money;
+  SFX.buy();
+  log(`⚙️ Переработка: ${r.name} → ${fmt(r.money)} 💰`, 'ok');
+  safe(updateHUD, 'updateHUD');
+  safe(renderCraft, 'renderCraft');
+  safe(renderShop, 'renderShop');
+}
+
+/* ---------- UI ---------- */
+function updateHUD() {
+  const prod = computeProduction();
+  const tool = getActiveTool();
+  const carryMax = getEffectiveCarryMax();
+  setText('rHay', fmt(S.hay));
+  setText('rMoney', fmt(S.money));
+  setText('rNeedles', S.needles);
+  const rateEl = document.getElementById('rRate');
+  if (rateEl) {
+    if (prod.autoMult > 0) {
+      rateEl.textContent = fmt(prod.straws);
+      rateEl.className = 'v';
+    } else {
+      rateEl.textContent = '0 (🔒)';
+      rateEl.className = 'v off';
+    }
+  }
+  setText('needlesFound', S.needles);
+  setText('playerLv', 'ур. ' + S.playerLv);
+  setText('carryHay', S.world.carried);
+  setText('carryMax', carryMax);
+  setText('playerLvHud', S.playerLv);
+
+  const equipEl = document.getElementById('equipHud');
+  if (equipEl) {
+    equipEl.textContent = tool ? `${tool.icon} ${tool.name} (ур. ${tool.level})` : '🖐 Без инструмента';
+  }
+  const autoEl = document.getElementById('autoHud');
+  if (autoEl) {
+    if (prod.autoMult === 0) {
+      autoEl.textContent = '🔒 Пассив: закрыт';
+      autoEl.className = 'wcell autooff';
+    } else {
+      autoEl.textContent = `⚡ Пассив: ${Math.round(prod.autoMult * 100)}% · ${fmt(prod.straws)}/сек`;
+      autoEl.className = 'wcell autoon';
+    }
+  }
+  updateBadges();
+}
+
+function updateBadges() {
+  const tabs = document.querySelectorAll('.tab');
+  let canBuy = 0;
+  SHOP_ITEMS.forEach(item => {
+    const lvl = S.shop[item.id] || 0;
+    if (lvl < item.max && S.money >= itemCost(item)) canBuy++;
+  });
+  let canTech = 0;
+  TECH_ITEMS.forEach(t => {
+    const reqOk = !t.requires || !!S.tech[t.requires];
+    if (!S.tech[t.id] && S.needles >= t.cost && reqOk) canTech++;
+  });
+  let canCraft = 0;
+  CRAFT_RECIPES.forEach(r => {
+    const unlocked = (r.unlock === 'mass' && S.tech['t4']) ||
+                     (r.unlock === 'bales' && S.tech['t7']) ||
+                     (r.unlock === 'paper' && S.tech['t9']);
+    if (unlocked && S.hay >= r.hay) canCraft++;
+  });
+  const badge = (n) => n > 0 ? `<span class="badge">${n}</span>` : '';
+  const map = { world: '', shop: badge(canBuy), tech: badge(canTech), craft: badge(canCraft), stats: '' };
+  tabs.forEach(tab => {
+    const key = tab.dataset.tab;
+    const label = tab.textContent.replace(/\d+$/, '').replace(/\s+$/, '');
+    tab.innerHTML = label + map[key];
+  });
+}
+
+function renderStats() {
+  const box = document.getElementById('statsBox');
+  if (!box) return;
+  const prod = computeProduction();
+  const tool = getActiveTool();
+  const time = Math.floor(S.playTime);
+  const hh = Math.floor(time / 3600);
+  const mm = Math.floor((time % 3600) / 60);
+  const ss = time % 60;
+  const autoLabel = prod.autoMult === 0
+    ? '<span style="color:#e05555">🔒 закрыт</span>'
+    : `<span style="color:#6fcf6f">${Math.round(prod.autoMult * 100)}%</span>`;
+  box.innerHTML = `
+    <div>🧵 Иголок: <b>${S.needles} / ${CONFIG.totalNeedles}</b></div>
+    <div>🌾 Сена: <b>${fmtInt(S.strawsTotal)}</b></div>
+    <div>📦 Сдано: <b>${fmtInt(S.totalDeposited)}</b></div>
+    <div>💰 Заработано: <b>${fmt(S.totalMoneyEarned)}</b></div>
+    <div>⚡ Пассив: <b>${fmt(prod.straws)}/сек</b> (${autoLabel})</div>
+    <div>🖱 Сборов: <b>${fmtInt(S.manualSearches)}</b></div>
+    <div>💪 Уровень: <b>${S.playerLv}</b> (XP ${S.playerXP}/${xpForLevel(S.playerLv)})</div>
+    <div>🎒 Вместимость: <b>${getEffectiveCarryMax()}</b></div>
+    <div>🤚 За раз: <b>${getCollectAmount()}</b> сена</div>
+    <div>🏃 Скорость: <b>${Math.round(getWalkSpeed())}</b></div>
+    <div>🔧 В руке: <b>${tool ? tool.icon + ' ' + tool.name + ' ур.' + tool.level : '—'}</b></div>
+    <div>⏱ Время: <b>${hh}ч ${mm}м ${ss}с</b></div>`;
+}
+
+function log(msg, cls = '') {
+  const el = document.getElementById('log');
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${msg}`;
+  el.insertBefore(line, el.firstChild);
+  while (el.children.length > 30) el.removeChild(el.lastChild);
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function showModal(title, text) {
+  const mt = document.getElementById('modalTitle');
+  const mx = document.getElementById('modalText');
+  const m = document.getElementById('modal');
+  if (mt) mt.textContent = title;
+  if (mx) mx.textContent = text;
+  if (m) m.classList.add('show');
+}
+
+window.__showError = function(msg) {
+  try {
+    let box = document.getElementById('__errbox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = '__errbox';
+      box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#a00;color:#fff;padding:8px;font:12px monospace;z-index:99999;max-height:80px;overflow:auto;';
+      document.body.appendChild(box);
+    }
+    box.textContent = '⚠ ' + msg;
+    setTimeout(() => { if (box) box.remove(); }, 6000);
+  } catch (e) { /* silent */ }
+};
+
+/* ---------- ИГРОВОЙ ЦИКЛ ---------- */
+let lastFrame = performance.now();
+let saveTimer = 0;
+let frameCount = 0;
+
+function gameLoop(now) {
+  const dt = Math.min(0.1, (now - lastFrame) / 1000);
+  lastFrame = now;
+  S.playTime += dt;
+  passiveIncome(dt);
+  saveTimer += dt;
+  if (saveTimer >= 5) { saveTimer = 0; safe(saveState, 'saveState'); }
+  frameCount++;
+  // На мобильных HUD обновляем реже
+  const hudInterval = IS_MOBILE ? 12 : 6;
+  if (frameCount % hudInterval === 0) {
+    safe(updateHUD, 'updateHUD');
+    const active = document.querySelector('.panel.active');
+    if (active) {
+      if (active.id === 'panel-stats') safe(renderStats, 'renderStats');
+      if (active.id === 'panel-craft') safe(renderCraft, 'renderCraft');
+    }
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+function saveState() {
+  S.lastTick = Date.now();
+  storage.set(CONFIG.saveKey, JSON.stringify(S));
+}
+
+/* ---------- ИНИЦИАЛИЗАЦИЯ ---------- */
+function init() {
+  try {
+    const now = Date.now();
+    const offline = Math.min((now - (S.lastTick || now)) / 1000, 3600);
+    if (offline > 5) {
+      const prod = computeProduction();
+      const gainedHay = prod.straws * offline;
+      if (gainedHay > 0) { S.hay += gainedHay; S.strawsTotal += gainedHay; }
+      S.searchProgress += prod.chanceBonus * offline * prod.autoMult;
+      while (S.searchProgress >= 1 && S.needles < CONFIG.totalNeedles) {
+        S.searchProgress -= 1; findNeedle(true);
+      }
+      if (gainedHay > 0) {
+        setTimeout(() => toast(`💤 Офлайн: +${fmt(gainedHay)} сена`), 600);
+      }
+    }
+  } catch (e) { console.warn('[offline]', e); }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      const panel = document.getElementById('panel-' + tab.dataset.tab);
+      if (panel) panel.classList.add('active');
+      if (tab.dataset.tab === 'shop') safe(renderShop, 'renderShop');
+      if (tab.dataset.tab === 'tech') safe(renderTech, 'renderTech');
+      if (tab.dataset.tab === 'craft') safe(renderCraft, 'renderCraft');
+      if (tab.dataset.tab === 'stats') safe(renderStats, 'renderStats');
+      beep(500, 0.04, 'sine', 0.05);
+      // Прокрутка наверх
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  const mc = document.getElementById('modalClose');
+  if (mc) mc.addEventListener('click', () => {
+    const m = document.getElementById('modal');
+    if (m) m.classList.remove('show');
+  });
+  const mdl = document.getElementById('modal');
+  if (mdl) mdl.addEventListener('click', (e) => {
+    if (e.target.id === 'modal') mdl.classList.remove('show');
+  });
+
+  const rb = document.getElementById('resetBtn');
+  if (rb) rb.addEventListener('click', () => {
+    if (confirm('Сбросить весь прогресс? Необратимо.')) {
+      storage.remove(CONFIG.saveKey);
+      S = defaultState();
+      safe(updateHUD, 'updateHUD');
+      safe(renderShop, 'renderShop');
+      safe(renderTech, 'renderTech');
+      safe(renderCraft, 'renderCraft');
+      toast('Прогресс сброшен');
+      log('🗑 Прогресс сброшен', 'bad');
+    }
+  });
+
+  const themeBtn = document.getElementById('themeBtn');
+  if (themeBtn) {
+    const savedTheme = storage.get(CONFIG.themeKey);
+    if (savedTheme === 'light') { document.body.classList.add('light'); themeBtn.textContent = '☀️'; }
+    themeBtn.addEventListener('click', () => {
+      document.body.classList.toggle('light');
+      const light = document.body.classList.contains('light');
+      themeBtn.textContent = light ? '☀️' : '🌙';
+      storage.set(CONFIG.themeKey, light ? 'light' : 'dark');
+    });
+  }
+
+  document.body.addEventListener('pointerdown', ensureAudio, { once: true });
+
+  safe(initWorld, 'initWorld');
+  safe(renderShop, 'renderShop');
+  safe(renderTech, 'renderTech');
+  safe(renderCraft, 'renderCraft');
+  safe(updateHUD, 'updateHUD');
+
+  log('Добро пожаловать! Пассивный доход заблокирован — копите иголки!', 'warn');
+  log(IS_MOBILE
+    ? 'Тап по куче сена — идти и собрать. Тап по базе — сдать сено.'
+    : 'WASD/стрелки — ходить. Пробел/E — действие. Клик — идти к точке.', 'warn');
+
+  lastFrame = performance.now();
+  requestAnimationFrame(gameLoop);
+
+  window.addEventListener('beforeunload', () => safe(saveState, 'saveState'));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) safe(saveState, 'saveState');
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => safe(init, 'init'));
+} else {
+  safe(init, 'init');
+}
+</script>
+</body>
+</html>
